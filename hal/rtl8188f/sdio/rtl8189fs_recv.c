@@ -448,12 +448,9 @@ s32 rtl8188fs_init_recv_priv(PADAPTER padapter)
 		goto initbuferror;
 
 	/* 3 2. init tasklet */
-#ifdef PLATFORM_LINUX
 	tasklet_init(&precvpriv->recv_tasklet,
-		     (void(*)(unsigned long))rtl8188fs_recv_tasklet,
+		     (void *)rtl8188fs_recv_tasklet,
 		     (unsigned long)padapter);
-#endif
-
 	goto exit;
 
 initbuferror:
