@@ -226,10 +226,11 @@ typedef void *timer_hdl_context;
 3f6cffb8604b537e3d7ea040d7f4368689638eaf
 adeef3e32146a8d2a73c399dc6f5d76a449131b1
 */
-static inline void eth_hw_addr_set(struct net_device *dev, const u8 *addr)
+static inline void rtw_eth_hw_addr_set(struct net_device *dev, const u8 *addr)
 {
 	memcpy(dev->dev_addr, addr, ETH_ALEN);
 }
+#define eth_hw_addr_set rtw_eth_hw_addr_set
 #endif
 
 typedef unsigned long systime;
