@@ -4108,6 +4108,9 @@ static int cfg80211_rtw_get_txpower(struct wiphy *wiphy,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
 	struct wireless_dev *wdev,
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+	unsigned int link_id,
+#endif
 	int *dbm)
 {
 	RTW_INFO("%s\n", __func__);
