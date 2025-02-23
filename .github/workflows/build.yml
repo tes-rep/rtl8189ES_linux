@@ -16,7 +16,7 @@ jobs:
 
   build:
     needs: fetchKernelData
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -35,10 +35,9 @@ jobs:
           [  -z "$AMD64_DEB" ] && exit 2
           wget -nv ${KERNEL_URL}v${VERSION}/$AMD64_DEB
           wget -nv ${KERNEL_URL}v${VERSION}/$ALL_DEB
-          wget -nv http://mirrors.edge.kernel.org/ubuntu/pool/main/g/glibc/libc6_2.39-0ubuntu8_amd64.deb
           sudo dpkg --force-all -i *.deb
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 14
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 14
           echo "KVER=$(echo $ALL_DEB | cut -d '_' -f 2 | rev | cut -c14- | rev)-generic" >> $GITHUB_ENV
       - uses: actions/checkout@v2
       - name: build
