@@ -13,8 +13,7 @@ jobs:
         JSON=$(curl -s https://www.kernel.org/releases.json)
         VERSIONSARRAY=$(echo "$JSON" | jq -c '[.releases[] | select(.moniker != "linux-next") | .version]')
         echo "matrix=$VERSIONSARRAY" >> $GITHUB_OUTPUT
-
-  build:
+build:
     needs: fetchKernelData
     runs-on: ubuntu-latest
     strategy:
