@@ -1,0 +1,248 @@
+name: Build RTL8189ES Driver
+
+on: [pull_request]
+
+jobs:
+  fetchKernelData:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - id: set-matrix
+      run: |
+        JSON=$(curl -s https://www.kernel.org/releases.json)
+        VERSIONSARRAY=$(echo "$JSON" | jq -c '[.releases[] | select(.moniker != "linux-next") | .version]')
+        echo "matrix=$VERSIONSARRAY" >> $GITHUB_OUTPUT
+
+  build:
+    needs: fetchKernelData
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.fetchKernelData.outputs.matrix) }}
+        # Versi bisa dibatasi untuk testing
+        # version: [6.1.1, 6.6.1]
+    steps:
+    - name: Install tools & deps
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential wget curl kmod gcc make jq unzip \
+          linux-headers-generic gcc-aarch64-linux-gnu
+
+    - name: Download Kernel (Ubuntu mainline)
+      env:
+        VERSION: ${{ matrix.version }}
+      run: |
+        BASE=https://kernel.ubuntu.com/~kernel-ppa/mainline/v${VERSION}
+        PAGE=$(wget -qO- $BASE/)
+        DEB_ALL=$(echo "$PAGE" | grep -oP 'linux-headers-.*all.deb' | head -n1)
+        DEB_AMD64=$(echo "$PAGE" | grep -oP 'linux-headers-.*amd64.deb' | head -n1)
+
+        wget -q "$BASE/$DEB_ALL"
+        wget -q "$BASE/$DEB_AMD64"
+        sudo dpkg -i *.deb
+
+        echo "KVER=$(basename $DEB_AMD64 | cut -d_ -f2 | sed 's/\.//g')" >> $GITHUB_ENV
+        echo "KERNEL_SRC=/lib/modules/$(uname -r)/build" >> $GITHUB_ENV
+
+    - name: Clone RTL8189ES Driver
+      run: |
+        git clone https://github.com/feryw/rtl8189ES_linux driver
+        ls driver
+
+    - name: Inject Minimal Makefile
+      run: |
+        cat <<'EOF' > driver/Makefile
+        obj-m += 8189es.o
+
+        8189es-objs := \
+          core/rtw_cmd.o \
+          core/rtw_xmit.o \
+          core/rtw_recv.o \
+          core/rtw_io.o \
+          core/rtw_mlme.o \
+          core/rtw_mlme_ext.o \
+          core/rtw_pwrctrl.o \
+          core/rtw_rf.o \
+          core/rtw_security.o \
+          core/rtw_debug.o \
+          core/rtw_sta_mgt.o \
+          core/rtw_ap.o \
+          core/rtw_p2p.o \
+          core/rtw_tdls.o \
+          core/rtw_wlan_util.o \
+          core/rtw_ieee80211.o \
+          core/rtw_efuse.o \
+          core/rtw_mp.o \
+          core/rtw_led.o \
+          core/rtw_br_ext.o \
+          hal/rtl8189e_hal_init.o \
+          hal/rtl8189e_phycfg.o \
+          hal/rtl8189e_rf6052.o \
+          hal/rtl8189e_rxdesc.o \
+          hal/rtl8189e_sreset.o \
+          hal/rtl8189e_xmit.o \
+          hal/usb_halinit.o \
+          hal/usb_ops_linux.o \
+          hal/usb_ops_recv.o \
+          hal/usb_ops_xmit.o \
+          os_dep/osdep_service.o \
+          os_dep/os_intfs.o \
+          os_dep/ioctl_linux.o \
+          os_dep/ioctl_cfg80211.o \
+          os_dep/mlme_linux.o \
+          os_dep/recv_linux.o \
+          os_dep/rtw_android.o \
+          os_dep/xmit_linux.o \
+          os_dep/usb_intf.o \
+          os_dep/usb_ops_linux.o \
+          os_dep/rtw_proc.o \
+          platform/platform_ops.o
+
+        KDIR ?= /lib/modules/$(shell uname -r)/build
+        PWD := $(shell pwd)
+
+        all:
+        	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
+        clean:
+        	$(MAKE) -C $(KDIR) M=$(PWD) clean
+        EOF
+
+    - name: Compile Driver
+      run: |
+        cd driver
+        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KDIR=$KERNEL_SRC
+        mkdir -p ../output
+        cp *.ko ../output/
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: rtl8189es-${{ matrix.version }}
+        path: output/*.ko
+     name: Build RTL8189ES Driver
+
+on: [pull_request]
+
+jobs:
+  fetchKernelData:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - id: set-matrix
+      run: |
+        JSON=$(curl -s https://www.kernel.org/releases.json)
+        VERSIONSARRAY=$(echo "$JSON" | jq -c '[.releases[] | select(.moniker != "linux-next") | .version]')
+        echo "matrix=$VERSIONSARRAY" >> $GITHUB_OUTPUT
+
+  build:
+    needs: fetchKernelData
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.fetchKernelData.outputs.matrix) }}
+        # Versi bisa dibatasi untuk testing
+        # version: [6.1.1, 6.6.1]
+    steps:
+    - name: Install tools & deps
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential wget curl kmod gcc make jq unzip \
+          linux-headers-generic gcc-aarch64-linux-gnu
+
+    - name: Download Kernel (Ubuntu mainline)
+      env:
+        VERSION: ${{ matrix.version }}
+      run: |
+        BASE=https://kernel.ubuntu.com/~kernel-ppa/mainline/v${VERSION}
+        PAGE=$(wget -qO- $BASE/)
+        DEB_ALL=$(echo "$PAGE" | grep -oP 'linux-headers-.*all.deb' | head -n1)
+        DEB_AMD64=$(echo "$PAGE" | grep -oP 'linux-headers-.*amd64.deb' | head -n1)
+
+        wget -q "$BASE/$DEB_ALL"
+        wget -q "$BASE/$DEB_AMD64"
+        sudo dpkg -i *.deb
+
+        echo "KVER=$(basename $DEB_AMD64 | cut -d_ -f2 | sed 's/\.//g')" >> $GITHUB_ENV
+        echo "KERNEL_SRC=/lib/modules/$(uname -r)/build" >> $GITHUB_ENV
+
+    - name: Clone RTL8189ES Driver
+      run: |
+        git clone https://github.com/feryw/rtl8189ES_linux driver
+        ls driver
+
+    - name: Inject Minimal Makefile
+      run: |
+        cat <<'EOF' > driver/Makefile
+        obj-m += 8189es.o
+
+        8189es-objs := \
+          core/rtw_cmd.o \
+          core/rtw_xmit.o \
+          core/rtw_recv.o \
+          core/rtw_io.o \
+          core/rtw_mlme.o \
+          core/rtw_mlme_ext.o \
+          core/rtw_pwrctrl.o \
+          core/rtw_rf.o \
+          core/rtw_security.o \
+          core/rtw_debug.o \
+          core/rtw_sta_mgt.o \
+          core/rtw_ap.o \
+          core/rtw_p2p.o \
+          core/rtw_tdls.o \
+          core/rtw_wlan_util.o \
+          core/rtw_ieee80211.o \
+          core/rtw_efuse.o \
+          core/rtw_mp.o \
+          core/rtw_led.o \
+          core/rtw_br_ext.o \
+          hal/rtl8189e_hal_init.o \
+          hal/rtl8189e_phycfg.o \
+          hal/rtl8189e_rf6052.o \
+          hal/rtl8189e_rxdesc.o \
+          hal/rtl8189e_sreset.o \
+          hal/rtl8189e_xmit.o \
+          hal/usb_halinit.o \
+          hal/usb_ops_linux.o \
+          hal/usb_ops_recv.o \
+          hal/usb_ops_xmit.o \
+          os_dep/osdep_service.o \
+          os_dep/os_intfs.o \
+          os_dep/ioctl_linux.o \
+          os_dep/ioctl_cfg80211.o \
+          os_dep/mlme_linux.o \
+          os_dep/recv_linux.o \
+          os_dep/rtw_android.o \
+          os_dep/xmit_linux.o \
+          os_dep/usb_intf.o \
+          os_dep/usb_ops_linux.o \
+          os_dep/rtw_proc.o \
+          platform/platform_ops.o
+
+        KDIR ?= /lib/modules/$(shell uname -r)/build
+        PWD := $(shell pwd)
+
+        all:
+        	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
+        clean:
+        	$(MAKE) -C $(KDIR) M=$(PWD) clean
+        EOF
+
+    - name: Compile Driver
+      run: |
+        cd driver
+        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KDIR=$KERNEL_SRC
+        mkdir -p ../output
+        cp *.ko ../output/
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: rtl8189es-${{ matrix.version }}
+        path: output/*.ko
